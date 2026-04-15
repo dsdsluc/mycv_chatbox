@@ -13,3 +13,4 @@ sentence-transformers
 numpy
 tqdm
 langdetect
+gunicorn

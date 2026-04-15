@@ -9,25 +9,26 @@ from src.helper import get_llm
 
 load_dotenv()
 
+# ======================
+# FLASK APP
+# ======================
 app = Flask(__name__)
 
 # ======================
 # LLM SETUP
 # ======================
 llm = get_llm()
-
 translator_llm = llm
 
 # ======================
-# RETRIEVER
+# RETRIEVER + PROMPT
 # ======================
 retriever = get_retriever()
-
 prompt = get_prompt()
 
 
 # ======================
-# TRANSLATION FUNCTIONS
+# TRANSLATION
 # ======================
 def translate_to_en(text):
     return translator_llm.invoke(
@@ -44,17 +45,20 @@ def translate_to_vi(text):
 # ======================
 # RAG PIPELINE
 # ======================
-def run_rag(user_message):
-    lang = detect(user_message)
+def run_rag(user_message: str):
+    try:
+        lang = detect(user_message)
+    except:
+        lang = "en"
 
-    # 1. Translate input nếu cần
+    # Translate input nếu không phải EN
     query = translate_to_en(user_message) if lang != "en" else user_message
 
-    # 2. Retrieve context
+    # Retrieve context
     docs = retriever.invoke(query)
-    context = "\n".join([d.page_content for d in docs])
+    context = "\n".join([d.page_content for d in docs]) if docs else ""
 
-    # 3. Build prompt
+    # Build prompt
     final_prompt = prompt.format(
         context=context,
         chat_history="",
@@ -62,10 +66,10 @@ def run_rag(user_message):
         owner_context=get_owner_context()
     )
 
-    # 4. Generate answer
+    # Generate answer
     answer = llm.invoke(final_prompt).content
 
-    # 5. Translate back nếu user là Vietnamese
+    # Translate back nếu user là VI
     if lang == "vi":
         answer = translate_to_vi(answer)
 
@@ -82,16 +86,15 @@ def home():
 
 @app.route("/chat", methods=["POST"])
 def chat():
-    msg = request.json.get("message", "").strip()
+    data = request.get_json(silent=True) or {}
+    msg = data.get("message", "").strip()
 
     if not msg:
         return jsonify({"error": "Empty message"}), 400
 
     response = run_rag(msg)
 
-    return jsonify({
-        "response": response
-    })
+    return jsonify({"response": response})
 
 
 @app.route("/health")
@@ -100,9 +103,11 @@ def health():
 
 
 # ======================
-# RUN SERVER
+# GUNICORN ENTRY (IMPORTANT)
 # ======================
+# Render sẽ dùng gunicorn app:app nên KHÔNG cần app.run()
+# Nhưng giữ lại để chạy local
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port, debug=False)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=True)
