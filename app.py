@@ -16,7 +16,7 @@ app = Flask(__name__)
 # ======================
 llm = get_llm()
 
-translator_llm = get_llm()
+translator_llm = llm
 
 # ======================
 # RETRIEVER
