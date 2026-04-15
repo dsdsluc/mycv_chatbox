@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>CV AI Assistant</title>
+
+    <!-- Font -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Tailwind CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- External CSS -->
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='style.css') }}"
+    />
+
+    <style>
+      body {
+        font-family: "Inter", sans-serif;
+      }
+    </style>
+  </head>
+
+  <body class="bg-slate-950 text-white flex flex-col h-screen">
+    <!-- HEADER -->
+    <header
+      class="text-center py-4 border-b border-slate-800 bg-slate-900/60 backdrop-blur"
+    >
+      <h1 class="text-lg font-semibold">💼 CV AI Assistant</h1>
+      <p class="text-xs text-slate-400">
+        Ask about experience, skills & projects
+      </p>
+    </header>
+
+    <!-- CHAT -->
+    <main
+      id="chat"
+      class="flex-1 overflow-y-auto px-4 py-6 space-y-4 max-w-3xl w-full mx-auto"
+    ></main>
+
+    <!-- INPUT -->
+    <footer
+      class="fixed bottom-0 w-full bg-slate-900/70 backdrop-blur border-t border-slate-800"
+    >
+      <div class="max-w-3xl mx-auto flex items-center gap-2 p-3">
+        <textarea
+          id="msg"
+          rows="1"
+          class="flex-1 resize-none rounded-xl bg-slate-800 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="Type your message..."
+        ></textarea>
+
+        <button
+          onclick="sendMessage()"
+          class="bg-blue-600 hover:bg-blue-500 transition px-5 py-3 rounded-xl text-sm font-medium"
+        >
+          Send
+        </button>
+      </div>
+    </footer>
+
+    <script>
+      function addMessage(text, type) {
+        const chat = document.getElementById("chat");
+
+        const wrapper = document.createElement("div");
+        wrapper.className = `flex ${type === "user" ? "justify-end" : "justify-start"}`;
+
+        const bubble = document.createElement("div");
+        bubble.className =
+          "max-w-[75%] px-4 py-3 rounded-2xl text-sm leading-relaxed shadow-md";
+
+        if (type === "user") {
+          bubble.classList.add("bg-blue-600", "rounded-br-md");
+        } else {
+          bubble.classList.add("bg-slate-800", "rounded-bl-md");
+        }
+
+        bubble.innerText = text;
+
+        wrapper.appendChild(bubble);
+        chat.appendChild(wrapper);
+
+        chat.scrollTop = chat.scrollHeight;
+      }
+
+      async function sendMessage() {
+        const input = document.getElementById("msg");
+        const text = input.value.trim();
+        if (!text) return;
+
+        addMessage(text, "user");
+        input.value = "";
+
+        addMessage("Thinking...", "bot");
+
+        const res = await fetch("/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: text }),
+        });
+
+        const data = await res.json();
+
+        const chat = document.getElementById("chat");
+        chat.lastChild.remove();
+
+        addMessage(data.response, "bot");
+      }
+
+      document.getElementById("msg").addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          sendMessage();
+        }
+      });
+    </script>
+  </body>
+</html>
