@@ -3,28 +3,42 @@ from langdetect import detect
 from dotenv import load_dotenv
 import os
 
-from store import get_retriever
-from src.prompt import get_prompt, get_owner_context
-from src.helper import get_llm
-
 load_dotenv()
 
-# ======================
-# FLASK APP
-# ======================
 app = Flask(__name__)
 
 # ======================
-# LLM SETUP
+# GLOBAL (KHÔNG CRASH IMPORT)
 # ======================
-llm = get_llm()
-translator_llm = llm
+llm = None
+translator_llm = None
+retriever = None
+prompt = None
+
 
 # ======================
-# RETRIEVER + PROMPT
+# INIT SERVICES SAFELY
 # ======================
-retriever = get_retriever()
-prompt = get_prompt()
+def init_services():
+    global llm, translator_llm, retriever, prompt
+
+    try:
+        from src.helper import get_llm
+        from store import get_retriever
+        from src.prompt import get_prompt
+
+        llm = get_llm()
+        translator_llm = llm
+        retriever = get_retriever()
+        prompt = get_prompt()
+
+        print("✅ INIT SUCCESS")
+
+    except Exception as e:
+        print("❌ INIT ERROR:", str(e))
+
+
+init_services()
 
 
 # ======================
@@ -51,25 +65,20 @@ def run_rag(user_message: str):
     except:
         lang = "en"
 
-    # Translate input nếu không phải EN
     query = translate_to_en(user_message) if lang != "en" else user_message
 
-    # Retrieve context
-    docs = retriever.invoke(query)
+    docs = retriever.invoke(query) if retriever else []
     context = "\n".join([d.page_content for d in docs]) if docs else ""
 
-    # Build prompt
     final_prompt = prompt.format(
         context=context,
         chat_history="",
         question=query,
-        owner_context=get_owner_context()
+        owner_context="AI Assistant"
     )
 
-    # Generate answer
-    answer = llm.invoke(final_prompt).content
+    answer = llm.invoke(final_prompt).content if llm else "Service not ready"
 
-    # Translate back nếu user là VI
     if lang == "vi":
         answer = translate_to_vi(answer)
 
@@ -99,15 +108,16 @@ def chat():
 
 @app.route("/health")
 def health():
-    return jsonify({"status": "ok"})
+    return jsonify({
+        "status": "ok",
+        "llm": llm is not None,
+        "retriever": retriever is not None
+    })
 
 
 # ======================
-# GUNICORN ENTRY (IMPORTANT)
+# LOCAL RUN ONLY
 # ======================
-# Render sẽ dùng gunicorn app:app nên KHÔNG cần app.run()
-# Nhưng giữ lại để chạy local
-
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=True)
