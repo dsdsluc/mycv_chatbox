@@ -33,7 +33,7 @@ def chunking_data(data):
 
 
 def get_embedding():
-    embeddings = OpenAIEmbeddings(
-        model="text-embedding-3-small" 
-    )
-    return embeddings
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise ValueError("OPENAI_API_KEY is not set")
+    return OpenAIEmbeddings(model="text-embedding-3-small")

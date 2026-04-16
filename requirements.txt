@@ -1,16 +1,13 @@
 flask
+gunicorn
 python-dotenv
 langchain
 langchain-community
 langchain-core
 langchain-openai
 langchain-text-splitters
-langchain-huggingface
 openai
 faiss-cpu
 pypdf
-sentence-transformers
 numpy
-tqdm
 langdetect
-gunicorn

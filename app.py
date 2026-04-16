@@ -7,18 +7,13 @@ load_dotenv()
 
 app = Flask(__name__)
 
-# ======================
-# GLOBAL (KHÔNG CRASH IMPORT)
-# ======================
 llm = None
 translator_llm = None
 retriever = None
 prompt = None
+_initialized = False
 
 
-# ======================
-# INIT SERVICES SAFELY
-# ======================
 def init_services():
     global llm, translator_llm, retriever, prompt
 
@@ -38,28 +33,35 @@ def init_services():
         print("❌ INIT ERROR:", str(e))
 
 
-init_services()
+# ✅ Lazy init - doesn't block Gunicorn startup
+@app.before_request
+def lazy_init():
+    global _initialized
+    if not _initialized:
+        init_services()
+        _initialized = True
 
 
-# ======================
-# TRANSLATION
-# ======================
 def translate_to_en(text):
+    if not translator_llm:
+        return text
     return translator_llm.invoke(
         f"Translate this to English:\n{text}"
     ).content
 
 
 def translate_to_vi(text):
+    if not translator_llm:
+        return text
     return translator_llm.invoke(
         f"Translate this to Vietnamese:\n{text}"
     ).content
 
 
-# ======================
-# RAG PIPELINE
-# ======================
 def run_rag(user_message: str):
+    if not llm or not prompt:
+        return "Service is still initializing, please try again in a moment."
+
     try:
         lang = detect(user_message)
     except:
@@ -77,7 +79,7 @@ def run_rag(user_message: str):
         owner_context="AI Assistant"
     )
 
-    answer = llm.invoke(final_prompt).content if llm else "Service not ready"
+    answer = llm.invoke(final_prompt).content
 
     if lang == "vi":
         answer = translate_to_vi(answer)
@@ -85,9 +87,6 @@ def run_rag(user_message: str):
     return answer
 
 
-# ======================
-# ROUTES
-# ======================
 @app.route("/")
 def home():
     return render_template("index.html")
@@ -102,7 +101,6 @@ def chat():
         return jsonify({"error": "Empty message"}), 400
 
     response = run_rag(msg)
-
     return jsonify({"response": response})
 
 
@@ -115,9 +113,6 @@ def health():
     })
 
 
-# ======================
-# LOCAL RUN ONLY
-# ======================
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=True)
